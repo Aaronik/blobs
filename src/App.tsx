@@ -1,4 +1,3 @@
-import React from 'react'
 import './App.css'
 import * as BABYLON from 'babylonjs'
 import Canvas from './components/canvas'
@@ -7,6 +6,22 @@ const height = window.innerHeight - 3
 const width = window.innerWidth
 
 const numSpheres = 5
+
+const getAveragePosition = (objects: { position: BABYLON.Vector3 }[]) => {
+  const sumVec = objects.reduce((sum, object) => {
+    return {
+      x: object.position.x + sum.x,
+      y: object.position.y + sum.y,
+      z: object.position.z + sum.z
+    }
+  }, { x: 0, y: 0, z: 0 })
+
+  return new BABYLON.Vector3(
+    sumVec.x / objects.length,
+    sumVec.y / objects.length,
+    sumVec.z / objects.length,
+  )
+}
 
 const createSphere = (id: string, scene: BABYLON.Scene) => {
   const opts = {
@@ -23,6 +38,7 @@ const createSphere = (id: string, scene: BABYLON.Scene) => {
 function App() {
 
   const onCanvas = (canvas: HTMLCanvasElement) => {
+    canvas.focus()
     // Load the 3D engine
     const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true })
     // CreateScene function that creates and return the scene
@@ -31,24 +47,28 @@ function App() {
       const scene = new BABYLON.Scene(engine)
       // Create a FreeCamera, and set its position to {x: 0, y: 5, z: -10}
       // const camera = new BABYLON.FreeCamera('camera1', new BABYLON.Vector3(0, 5, -10), scene)
-      const camera = new BABYLON.ArcRotateCamera('camera1', 1, 1, 1, new BABYLON.Vector3(0, 5, -10), scene)
+      const camera = new BABYLON.ArcRotateCamera('camera1', 10, 10, 10, new BABYLON.Vector3(2.5, 2.5, 2.5), scene)
 
-      // Target the camera to scene origin
-      camera.setTarget(BABYLON.Vector3.Zero())
-      // Attach the camera to the canvas
-      camera.attachControl(canvas, false)
       // Create a basic light, aiming 0, 1, 0 - meaning, to the sky
       new BABYLON.HemisphericLight('light1', new BABYLON.Vector3(0, 1, 0), scene)
       // Create a built-in "sphere" shape its constructor takes 6 params: name, segment, diameter, scene, updatable, sideOrientation
+
+      const spheres = []
       for (let i = 0; i < numSpheres; i++) {
-        createSphere('sphere-' + i, scene)
+        spheres.push(createSphere('sphere-' + i, scene))
       }
 
-      scene.onPointerDown = function(_evt, pickInfo) {
-        if (pickInfo.hit && pickInfo.pickedMesh) {
-          camera.focusOn([pickInfo.pickedMesh], true);
-        }
-      }
+      // Target the camera to scene origin
+      camera.setTarget(getAveragePosition(spheres))
+      // Attach the camera to the canvas
+      camera.attachControl(canvas, false)
+
+      // // Focus camera on sphere that's clicked on. Uses ArcRotateCamera
+      // scene.onPointerDown = function(_evt, pickInfo) {
+      //   if (pickInfo.hit && pickInfo.pickedMesh) {
+      //     camera.focusOn([pickInfo.pickedMesh], true);
+      //   }
+      // }
 
       // Return the created scene
       return scene
