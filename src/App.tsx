@@ -8,13 +8,13 @@ const width = window.innerWidth
 
 const numSpheres = 5
 
-const createSphere = (scene: BABYLON.Scene) => {
+const createSphere = (id: string, scene: BABYLON.Scene) => {
   const opts = {
     segments: 32,
     diameter: Math.random() * 2
   }
 
-  const sphere = BABYLON.MeshBuilder.CreateSphere('sphere1', opts, scene)
+  const sphere = BABYLON.MeshBuilder.CreateSphere(id, opts, scene)
   sphere.position = new BABYLON.Vector3(Math.random() * 5, Math.random() * 5, Math.random() * 5)
 
   return sphere
@@ -30,7 +30,9 @@ function App() {
       // Create a basic BJS Scene object
       const scene = new BABYLON.Scene(engine)
       // Create a FreeCamera, and set its position to {x: 0, y: 5, z: -10}
-      const camera = new BABYLON.FreeCamera('camera1', new BABYLON.Vector3(0, 5, -10), scene)
+      // const camera = new BABYLON.FreeCamera('camera1', new BABYLON.Vector3(0, 5, -10), scene)
+      const camera = new BABYLON.ArcRotateCamera('camera1', 1, 1, 1, new BABYLON.Vector3(0, 5, -10), scene)
+
       // Target the camera to scene origin
       camera.setTarget(BABYLON.Vector3.Zero())
       // Attach the camera to the canvas
@@ -39,8 +41,15 @@ function App() {
       new BABYLON.HemisphericLight('light1', new BABYLON.Vector3(0, 1, 0), scene)
       // Create a built-in "sphere" shape its constructor takes 6 params: name, segment, diameter, scene, updatable, sideOrientation
       for (let i = 0; i < numSpheres; i++) {
-        createSphere(scene)
+        createSphere('sphere-' + i, scene)
       }
+
+      scene.onPointerDown = function(_evt, pickInfo) {
+        if (pickInfo.hit && pickInfo.pickedMesh) {
+          camera.focusOn([pickInfo.pickedMesh], true);
+        }
+      }
+
       // Return the created scene
       return scene
     }
