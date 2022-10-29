@@ -38,7 +38,7 @@ const createSphere = (id: string, scene: BABYLON.Scene) => {
 
   const opts = {
     segments: 32,
-    diameter: 1
+    diameter: Math.random() * 2
   }
 
   const sphere = BABYLON.MeshBuilder.CreateSphere(id, opts, scene)
@@ -92,6 +92,8 @@ function App() {
 
           if (highlight.hasMesh(mesh)) {
             highlight.removeMesh(mesh)
+            const particleSystems = mesh.getEmittedParticleSystems()
+            particleSystems.forEach(ps => ps.stop())
           } else {
             highlight.addMesh(mesh, BABYLON.Color3.White())
 
@@ -106,12 +108,14 @@ function App() {
                 const particleSystem = new BABYLON.GPUParticleSystem('particles', { capacity: 500 }, scene)
                 const particleSize = 0.3
                 const toPos = mesh.position.subtract(sphere.position)
+                const emitterRadius = sphere.getBoundingInfo().boundingSphere.radius
 
-                const initialSpeed = toPos.length() * 3.3
+                const initialSpeed = toPos.length() * 3.3 // Magic number which seems to get particles to stop _near_ their destination
 
-                particleSystem.addLimitVelocityGradient(0, initialSpeed); //speed limit at start of particle lifetime
-                particleSystem.addLimitVelocityGradient(1, 0.1); //speed limit at end of particle lifetime
-                particleSystem.emitRate = 100
+                particleSystem.addLimitVelocityGradient(0, initialSpeed) //speed limit at start of particle lifetime
+                particleSystem.addLimitVelocityGradient(1, 0.1) //speed limit at end of particle lifetime
+
+                particleSystem.emitRate = emitterRadius * 100
                 particleSystem.particleTexture = new BABYLON.Texture('flare.png')
                 particleSystem.emitter = sphere
 
@@ -131,7 +135,8 @@ function App() {
 
                 particleSystem.start()
 
-                highlight.removeAllMeshes()
+                highlight.removeMesh(sphere)
+                highlight.removeMesh(mesh)
               }
             })
           }
