@@ -102,28 +102,34 @@ function App() {
             spheres.forEach(sphere => {
               if (sphere.name === mesh.name) { return }
               if (highlight.hasMesh(sphere)) {
-                const ps = new BABYLON.ParticleSystem('particles', 500, scene)
-                ps.emitRate = 100
-                ps.particleTexture = new BABYLON.Texture('flare.png')
-                ps.emitter = sphere
+
+                const particleSystem = new BABYLON.GPUParticleSystem('particles', { capacity: 500 }, scene)
+                const particleSize = 0.3
+                const toPos = mesh.position.subtract(sphere.position)
+
+                const initialSpeed = toPos.length() * 3.3
+
+                particleSystem.addLimitVelocityGradient(0, initialSpeed); //speed limit at start of particle lifetime
+                particleSystem.addLimitVelocityGradient(1, 0.1); //speed limit at end of particle lifetime
+                particleSystem.emitRate = 100
+                particleSystem.particleTexture = new BABYLON.Texture('flare.png')
+                particleSystem.emitter = sphere
 
                 // @ts-ignore
-                ps.color1 = BABYLON.Color4.FromColor3(sphere.material.emissiveColor)
+                particleSystem.color1 = BABYLON.Color4.FromColor3(sphere.material.emissiveColor)
                 // @ts-ignore
-                ps.color2 = BABYLON.Color4.FromColor3(sphere.material.emissiveColor)
+                particleSystem.color2 = BABYLON.Color4.FromColor3(sphere.material.emissiveColor)
 
                 // ps.createHemisphericEmitter(1, 1)
 
-                const size = 0.3
-                ps.maxSize = size
-                ps.minSize = size
+                particleSystem.maxSize = particleSize
+                particleSystem.minSize = particleSize
 
-                const toPos = mesh.position.subtract(sphere.position)
-                ps.direction1 = toPos
-                ps.direction2 = toPos
-                ps.gravity = toPos
+                particleSystem.direction1 = toPos
+                particleSystem.direction2 = toPos
+                particleSystem.gravity = toPos
 
-                ps.start()
+                particleSystem.start()
 
                 highlight.removeAllMeshes()
               }
