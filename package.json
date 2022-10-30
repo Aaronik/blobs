@@ -11,6 +11,8 @@
     "@types/react": "^18.0.24",
     "@types/react-dom": "^18.0.8",
     "babylonjs": "^5.30.0",
+    "babylonjs-loaders": "^5.30.0",
+    "cannon": "^0.6.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
