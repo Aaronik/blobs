@@ -2,15 +2,9 @@ import * as BABYLON from 'babylonjs'
 import 'babylonjs-loaders'
 window.CANNON = require('cannon')
 
-type ProjectileDatum = {
-  fromMesh: BABYLON.Mesh
-  sphere: BABYLON.Mesh
-  trail: BABYLON.TrailMesh
-  orb: BABYLON.AbstractMesh
-  velocity: BABYLON.Vector3
-}
-
-const projectileData: { [name: string]: ProjectileDatum[] } = {}
+// I wish I could get these from the scene object but I haven't figured out how
+// TODO see http://www.babylonjs.com.cn/how_to/solid_particle_system.html section Particle Intersections
+const particleSystems: { [name: string]: BABYLON.SolidParticleSystem } = {}
 
 // Originally nicked from https://playground.babylonjs.com/#1F4UET#33
 
@@ -33,6 +27,17 @@ export const start = async (from: BABYLON.Mesh, to: BABYLON.Mesh, scene: BABYLON
   // scene.enablePhysics(new BABYLON.Vector3(0, -9.8 / 3, 0), new BABYLON.AmmoJSPlugin())
   // scene.enablePhysics(to.position.subtract(from.position))
 
+  /************* THESE ARE THE GOODS *******************/
+
+  // const orbParentSphere = BABYLON.MeshBuilder.CreateSphere("s", { segments: 16, diameter: 0.7 }, scene)
+  // orbParentSphere.isVisible = false
+
+  // TODO This goes to initParticles
+  // orb.setParent(orbParentSphere)
+
+  // orbParentSphere.bakeCurrentTransformIntoVertices()
+  // orbParentSphere.computeWorldMatrix(true)
+
   // orbParentSphere.scaling.scaleInPlace(0.3) // TODO What's this for
   // orb.scaling.scaleInPlace(0.03) // TODO What's this for
   // orb.rotation.set(Math.random() * 2 * Math.PI, Math.random() * 2 * Math.PI, Math.random() * 2 * Math.PI) // TODO What's this for
@@ -42,6 +47,35 @@ export const start = async (from: BABYLON.Mesh, to: BABYLON.Mesh, scene: BABYLON
   //   mass: 1,
   //   restitution: 0.6
   // })
+
+  /**************** THE GOODS ***************************/
+
+  // // TODO COnsider whether this is necessary
+  // scene.addMesh(orbParentSphere)
+
+  const SPS = new BABYLON.SolidParticleSystem("SPS-" + from.name, scene, { useModelMaterial: true })
+  particleSystems[from.name] = SPS
+  SPS.computeParticleRotation = false
+
+  const orbParentSphere = BABYLON.MeshBuilder.CreateSphere('sphere', { segments: 16, diameter: 1 }, scene)
+  SPS.addShape(orbParentSphere, numParticles)
+  orbParentSphere.dispose()
+
+  const trail = new BABYLON.TrailMesh('trail', orbParentSphere, scene, 0.2, 30, true)
+  const sourceMat = new BABYLON.StandardMaterial('sourceMat', scene) // This'll be the material on the trail
+  const color = BABYLON.Color3.Red()
+  sourceMat.emissiveColor = sourceMat.diffuseColor = color
+  sourceMat.specularColor = BABYLON.Color3.Black()
+  trail.material = sourceMat
+  SPS.addShape(trail, numParticles)
+  trail.dispose()
+
+  const pinkEnergyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync("pinkEnergyBall.glb", undefined, scene)
+  const orb = pinkEnergyBall.meshes[0]
+  orb.setParent(orbParentSphere)
+  // SPS.addShape(orb as BABYLON.Mesh, numParticles) // TODO This casting may cause issues
+
+  SPS.buildMesh() // finally builds and displays the SPS mesh
 
   const getRandomBoundingPosition = (mesh: BABYLON.Mesh) => {
     const emitterRadius = from.getBoundingInfo().boundingSphere.radiusWorld
@@ -53,66 +87,46 @@ export const start = async (from: BABYLON.Mesh, to: BABYLON.Mesh, scene: BABYLON
     return mesh.position.add(vec)
   }
 
-  const recycleProjectile = (pd: ProjectileDatum) => {
-    pd.sphere.position = getRandomBoundingPosition(from)
-    pd.velocity = to.position.subtract(pd.fromMesh.position).normalize().scale(0.5)
+  const recycleParticle = (particle: BABYLON.SolidParticle) => {
+    particle.position = getRandomBoundingPosition(from)
+    particle.velocity = to.position.subtract(particle.position).normalize().scale(Math.random() * 0.1)
+    return particle
   }
 
-  const initParticles = async () => {
-    for (let i = 0; i < numParticles; i++) {
-
-      const sphere = BABYLON.MeshBuilder.CreateSphere('projectile-sphere-' + i, { segments: 16, diameter: 1 }, scene)
-      sphere.isVisible = false
-      scene.addMesh(sphere)
-
-      const trail = new BABYLON.TrailMesh('trail', sphere, scene, 0.2, 30, true)
-      const sourceMat = new BABYLON.StandardMaterial('sourceMat', scene) // This'll be the material on the trail
-      const color = BABYLON.Color3.Red()
-      sourceMat.emissiveColor = sourceMat.diffuseColor = color
-      sourceMat.specularColor = BABYLON.Color3.Black()
-      trail.material = sourceMat
-
-      const pinkEnergyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync("pinkEnergyBall.glb", undefined, scene)
-      const orb = pinkEnergyBall.meshes[0]
-      orb.setParent(sphere)
-      orb.scaling.scaleInPlace(0.03)
-      scene.addMesh(orb, true)
-
-      const datum = { fromMesh: from, sphere, trail, orb, velocity: BABYLON.Vector3.Zero() }
-      if (projectileData[from.name]) {
-        projectileData[from.name].push(datum)
-      } else {
-        projectileData[from.name] = [datum]
-      }
-
-      recycleProjectile(datum)
+  SPS.initParticles = () => {
+    for (let p = 0; p < SPS.nbParticles; p++) {
+      const particle = SPS.particles[p]
+      recycleParticle(particle)
     }
   }
 
-  const update = (projectileDatum: ProjectileDatum) => {
-    const sphere = projectileDatum.sphere
-    const distanceTraveled = sphere.position.subtract(from.position).length()
+  SPS.updateParticle = (particle) => {
+    const distanceTraveled = particle.position.subtract(from.position).length()
     const distanceToTravel = to.position.subtract(from.position).length()
 
     const hasCollidedWithDestination = distanceTraveled > distanceToTravel
 
     if (hasCollidedWithDestination) {
-      return recycleProjectile(projectileDatum)
+      return recycleParticle(particle)
     }
 
-    sphere.position.addInPlace(projectileDatum.velocity)
+    particle.position.addInPlace(particle.velocity)
 
-    return sphere
+    return particle
   }
 
-  initParticles()
+  SPS.initParticles()
+  SPS.setParticles()
 
   // from https://doc.babylonjs.com/features/featuresDeepDive/particles/solid_particle_system/sps_animate
   scene.onBeforeRenderObservable.add(() => {
-    projectileData[from.name]?.forEach(projectileDatum => {
-      update(projectileDatum)
-    })
+    SPS.setParticles()
   })
+
+  scene.onAfterRenderObservable.add(() => {
+    SPS.setParticles()
+  })
+
 
   // // Create physics impostors // This ground looked great in the example
   // const ground = BABYLON.Mesh.CreateBox("Ground", 1, scene)
@@ -133,13 +147,10 @@ export const start = async (from: BABYLON.Mesh, to: BABYLON.Mesh, scene: BABYLON
 * @param {BABYLON.Mesh} mesh The mesh from which the particles should stop emitting
 */
 export const stopFor = (mesh: BABYLON.Mesh, scene: BABYLON.Scene) => {
-  scene.onBeforeRenderObservable.clear() // TODO This'll clear all of em but really we just want to clear ours
-  const pd = projectileData[mesh.name]
-  pd.forEach(d => {
-    d.sphere.dispose() // TODO Introduce "cancel" or something whereby this is marked for deletion and recycle deletes it after it finishes its final path
-    d.trail.dispose()
-    d.orb.dispose()
-  })
-  delete projectileData[mesh.name]
-}
+  scene.onAfterRenderObservable.clear()
+  scene.onBeforeRenderObservable.clear()
 
+  const SPS = particleSystems[mesh.name]
+  SPS?.dispose()
+  delete particleSystems[mesh.name]
+}
