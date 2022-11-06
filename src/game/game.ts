@@ -106,7 +106,7 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
 
       if (highlight.hasMesh(mesh)) {
         highlight.removeMesh(mesh)
-        ammoOrbs.stopFor(mesh, scene)
+        ammoOrbs.stopFor(pickedSphere, scene)
       } else {
         highlight.addMesh(mesh, BABYLON.Color3.White())
 
