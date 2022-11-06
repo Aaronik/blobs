@@ -29,4 +29,3 @@ const Canvas = (props: CanvasProps) => {
 }
 
 export default Canvas
-

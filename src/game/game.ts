@@ -33,34 +33,35 @@ const getAveragePosition = (objects: { position: BABYLON.Vector3 }[]) => {
   )
 }
 
-const createSphere = async (id: string, scene: BABYLON.Scene) => {
+const createSphere = async (scene: BABYLON.Scene) => {
+  const id = window.crypto.randomUUID()
+
   const opts = {
     segments: 32,
     diameter: Math.round(Math.random() * MAX_SPHERE_SIZE)
   }
 
-  const sphere = BABYLON.MeshBuilder.CreateSphere(id, opts, scene)
+  const sphere = BABYLON.MeshBuilder.CreateSphere('sphere-' + id, opts, scene)
 
-  // sphere.isVisible = false
-  // scene.addMesh(sphere)
+  sphere.isVisible = false
 
-  // // This is great but it's a little buggy. I'm starting to wonder if babylon.js isn't just very buggy.
-  // const greenEnergyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync("greenEnergyBall.glb", undefined, scene)
-  // const orb = greenEnergyBall.meshes[0]
-  // orb.name = 'orb-' + id
-  // orb.setParent(sphere)
-  // orb.scaling.scaleInPlace(0.1)
-  // scene.addMesh(orb, true)
+  // This is great but it's a little buggy. I'm starting to wonder if babylon.js isn't just very buggy.
+  const greenEnergyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync("greenEnergyBall.glb", undefined, scene)
+  const orb = greenEnergyBall.meshes[0]
+  orb.name = 'orb-' + id
+  orb.setParent(sphere)
+  scene.addMesh(orb, true)
 
+  sphere.scaling.scaleInPlace(0.1)
   sphere.position = new BABYLON.Vector3(
     Math.random() * SPHERE_POSITION_SPREAD,
     Math.random() * SPHERE_POSITION_SPREAD,
     Math.random() * SPHERE_POSITION_SPREAD
   )
 
-  const material = new BABYLON.StandardMaterial('material', scene)
-  material.emissiveColor = COLORS3.green
-  sphere.material = material
+  // const material = new BABYLON.StandardMaterial('material', scene)
+  // material.emissiveColor = COLORS3.green
+  // sphere.material = material
 
   return sphere
 }
@@ -79,7 +80,7 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
 
   const spheres: BABYLON.Mesh[] = []
   for (let i = 0; i < NUM_SPHERES; i++) {
-    spheres.push(await createSphere('sphere-' + i, scene))
+    spheres.push(await createSphere(scene))
   }
 
   // Target the camera to scene origin
@@ -87,9 +88,9 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
   // Attach the camera to the canvas
   camera.attachControl(canvas, false)
 
-  // // Glow layer so everything glows
-  // const glow = new BABYLON.GlowLayer('glow', scene)
-  // glow.intensity = 1
+  // Glow layer so everything glows
+  const glow = new BABYLON.GlowLayer('glow', scene)
+  glow.intensity = 0.5
 
   // Make highlight layer, for when things are clicked on
   const highlight = new BABYLON.HighlightLayer('hl1', scene)
@@ -101,6 +102,7 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
   scene.onPointerDown = function(_evt, pickInfo) {
     if (pickInfo.hit && pickInfo.pickedMesh) {
       const mesh = pickInfo.pickedMesh as BABYLON.Mesh
+      const pickedSphere = mesh.parent!.parent! as BABYLON.Mesh
 
       if (highlight.hasMesh(mesh)) {
         highlight.removeMesh(mesh)
@@ -113,15 +115,17 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
         // * start particle emitter towards other sphere
         // * Remove all highlights
         spheres.forEach(sphere => {
-          if (sphere.name === mesh.name) { return }
-          if (highlight.hasMesh(sphere)) {
-            ammoOrbs.start(sphere, mesh, scene)
+          const sphereHighlightedMesh = sphere.getChildMeshes()[3] as BABYLON.Mesh
 
-            // In attempts to prevent the screen from going bonkers
-            setTimeout(() => {
-              highlight.removeMesh(sphere)
-              highlight.removeMesh(mesh)
-            }, 1)
+          // If this sphere is the clicked sphere
+          if (sphere.name === pickedSphere.name) {
+            return
+          }
+
+          // If one sphere is clicked then another
+          if (highlight.hasMesh(sphereHighlightedMesh)) {
+            ammoOrbs.start(sphere, pickedSphere, scene)
+            highlight.removeAllMeshes()
           }
         })
       }

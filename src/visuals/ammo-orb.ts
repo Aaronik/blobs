@@ -103,11 +103,8 @@ const updateAll = (scene: Scene) => () => {
 }
 
 const removeProjectile = (pd: ProjectileDatum) => {
-  console.log('removing projectile: ' + pd.id)
   pd.sphere.dispose()
   pd.trail.dispose()
-  // pd.orb.dispose()
-  // delete projectileData[pd.from.name] // TODO This is wrong, projectileData is for a from.name
   const projectileIndex = projectileData[pd.from.name].findIndex(pdat => pdat.id === pd.id)
   projectileData[pd.from.name].splice(projectileIndex, 1)
 }

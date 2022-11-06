@@ -6,7 +6,6 @@ const height = window.innerHeight - 3
 const width = window.innerWidth
 
 function App() {
-
   const onCanvas = (canvas: HTMLCanvasElement) => {
     canvas.focus()
     game(canvas)
