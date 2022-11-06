@@ -52,7 +52,7 @@ const createSphere = async (scene: BABYLON.Scene) => {
   orb.setParent(sphere)
   scene.addMesh(orb, true)
 
-  sphere.scaling.scaleInPlace(0.1)
+  sphere.scaling.scaleInPlace(0.1).scaleInPlace(opts.diameter)
   sphere.position = new BABYLON.Vector3(
     Math.random() * SPHERE_POSITION_SPREAD,
     Math.random() * SPHERE_POSITION_SPREAD,
