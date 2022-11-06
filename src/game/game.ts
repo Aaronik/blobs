@@ -4,8 +4,8 @@ import * as ammoOrbs from '../visuals/ammo-orb'
 
 const NUM_SPHERES = 5
 const MAX_SPHERE_SIZE = 4
-const SPHERE_POSITION_SPREAD = MAX_SPHERE_SIZE * 3
-const INITIAL_CAMERA_DISTANCE = MAX_SPHERE_SIZE * 10
+const SPHERE_POSITION_SPREAD = MAX_SPHERE_SIZE * 10
+const INITIAL_CAMERA_DISTANCE = SPHERE_POSITION_SPREAD * 1.5
 
 const COLORS3 = {
   green: new BABYLON.Color3(0, 42 / 255, 16 / 255), // dark green
@@ -33,13 +33,24 @@ const getAveragePosition = (objects: { position: BABYLON.Vector3 }[]) => {
   )
 }
 
-const createSphere = (id: string, scene: BABYLON.Scene) => {
+const createSphere = async (id: string, scene: BABYLON.Scene) => {
   const opts = {
     segments: 32,
     diameter: Math.round(Math.random() * MAX_SPHERE_SIZE)
   }
 
   const sphere = BABYLON.MeshBuilder.CreateSphere(id, opts, scene)
+
+  // sphere.isVisible = false
+  // scene.addMesh(sphere)
+
+  // // This is great but it's a little buggy. I'm starting to wonder if babylon.js isn't just very buggy.
+  // const greenEnergyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync("greenEnergyBall.glb", undefined, scene)
+  // const orb = greenEnergyBall.meshes[0]
+  // orb.name = 'orb-' + id
+  // orb.setParent(sphere)
+  // orb.scaling.scaleInPlace(0.1)
+  // scene.addMesh(orb, true)
 
   sphere.position = new BABYLON.Vector3(
     Math.random() * SPHERE_POSITION_SPREAD,
@@ -54,7 +65,7 @@ const createSphere = (id: string, scene: BABYLON.Scene) => {
   return sphere
 }
 
-const createScene = (engine: BABYLON.Engine, canvas: HTMLCanvasElement) => {
+const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) => {
   // Create a basic BJS Scene object
   const scene = new BABYLON.Scene(engine)
   // Create a FreeCamera, and set its position to {x: 0, y: 5, z: -10}
@@ -68,7 +79,7 @@ const createScene = (engine: BABYLON.Engine, canvas: HTMLCanvasElement) => {
 
   const spheres: BABYLON.Mesh[] = []
   for (let i = 0; i < NUM_SPHERES; i++) {
-    spheres.push(createSphere('sphere-' + i, scene))
+    spheres.push(await createSphere('sphere-' + i, scene))
   }
 
   // Target the camera to scene origin
@@ -82,6 +93,9 @@ const createScene = (engine: BABYLON.Engine, canvas: HTMLCanvasElement) => {
 
   // Make highlight layer, for when things are clicked on
   const highlight = new BABYLON.HighlightLayer('hl1', scene)
+
+  // Get them projectiles set up
+  ammoOrbs.init(scene)
 
   // Focus camera on sphere that's clicked on. Uses ArcRotateCamera
   scene.onPointerDown = function(_evt, pickInfo) {
@@ -117,13 +131,13 @@ const createScene = (engine: BABYLON.Engine, canvas: HTMLCanvasElement) => {
   // Return the created scene
   return scene
 }
-const game = (canvas: HTMLCanvasElement) => {
+const game = async (canvas: HTMLCanvasElement) => {
   // Load the 3D engine
   const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true })
   // CreateScene function that creates and return the scene
 
   // call the createScene function
-  const scene = createScene(engine, canvas)
+  const scene = await createScene(engine, canvas)
 
   // run the render loop
   engine.runRenderLoop(function() {
