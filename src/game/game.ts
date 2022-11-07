@@ -4,7 +4,7 @@ import * as ammoOrbs from '../visuals/ammo-orb'
 
 const NUM_SPHERES = 5
 const MAX_SPHERE_SIZE = 4
-const SPHERE_POSITION_SPREAD = MAX_SPHERE_SIZE * 10
+const SPHERE_POSITION_SPREAD = MAX_SPHERE_SIZE * 20
 const INITIAL_CAMERA_DISTANCE = SPHERE_POSITION_SPREAD * 1.5
 
 const COLORS3 = {
@@ -33,7 +33,7 @@ const getAveragePosition = (objects: { position: BABYLON.Vector3 }[]) => {
   )
 }
 
-const createSphere = async (scene: BABYLON.Scene) => {
+const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[]) => {
   const id = window.crypto.randomUUID()
 
   const opts = {
@@ -53,15 +53,28 @@ const createSphere = async (scene: BABYLON.Scene) => {
   scene.addMesh(orb, true)
 
   sphere.scaling.scaleInPlace(0.1).scaleInPlace(opts.diameter)
-  sphere.position = new BABYLON.Vector3(
-    Math.random() * SPHERE_POSITION_SPREAD,
-    Math.random() * SPHERE_POSITION_SPREAD,
-    Math.random() * SPHERE_POSITION_SPREAD
-  )
 
-  // const material = new BABYLON.StandardMaterial('material', scene)
-  // material.emissiveColor = COLORS3.green
-  // sphere.material = material
+  const getRandomPosition = () => {
+    return new BABYLON.Vector3(
+      Math.random() * SPHERE_POSITION_SPREAD,
+      Math.random() * SPHERE_POSITION_SPREAD,
+      Math.random() * SPHERE_POSITION_SPREAD
+    )
+  }
+
+  sphere.position = getRandomPosition()
+
+  // TODO This does not work and I'm tired of figuring it out. The issue is that intersectsMesh ALWAYS returns true.
+  const ensureNoOverlap = () => {
+    const hasIntersections = existingSpheres.some(existingSphere => existingSphere.intersectsMesh(sphere, true, true))
+    if (hasIntersections) {
+      console.log('found collision making ' + sphere.name)
+      sphere.position = getRandomPosition()
+      // ensureNoOverlap()
+    }
+  }
+
+  ensureNoOverlap()
 
   return sphere
 }
@@ -77,11 +90,28 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
   light.intensity = 0.3
 
   // TODO https://playground.babylonjs.com/#1F4UET#33 has a ground that I think would be nice to have
+  // // Create physics impostors // This ground looked great in the example
+  // const ground = Mesh.CreateBox("Ground", 1, scene)
+  // ground.scaling = new BABYLON.Vector3(100, 1, 100)
+  // ground.position.y = environment.ground.position.y - (0.5 + 0.001)
+  // ground.material = new BABYLON.StandardMaterial("test", scene)
+  // ground.material.alpha = 0.99
+  // ground.material.alphaMode = BABYLON.Engine.ALPHA_ONEONE
+
+  // // Set up new rendering pipeline for glow // TODO This is an important visual effect
+  // const pipeline = new BABYLON.DefaultRenderingPipeline("default", true, scene, [camera])
+  // scene.imageProcessingConfiguration.toneMappingEnabled = true
+  // scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES
+  // scene.imageProcessingConfiguration.exposure = 3
+  // pipeline.glowLayerEnabled = true
+  // pipeline.glowLayer.intensity = 0.5
 
   const spheres: BABYLON.Mesh[] = []
   for (let i = 0; i < NUM_SPHERES; i++) {
-    spheres.push(await createSphere(scene))
+    spheres.push(await createSphere(scene, spheres))
   }
+  // @ts-ignore
+  window.spheres = spheres
 
   // Target the camera to scene origin
   camera.setTarget(getAveragePosition(spheres))

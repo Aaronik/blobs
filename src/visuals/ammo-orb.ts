@@ -12,7 +12,6 @@ type ProjectileDatum = {
   to: Mesh
   sphere: Mesh
   trail: BABYLON.TrailMesh
-  // orb: BABYLON.AbstractMesh
   velocity: BABYLON.Vector3
 }
 
@@ -42,24 +41,17 @@ const initProjectile = async (to: Mesh, from: Mesh, scene: Scene) => {
   sphere.position = getRandomBoundingPosition(from)
   sphere.computeWorldMatrix(true)
 
-  const velocity = to.position.subtract(from.position).normalize().scale(0.5)
-
-  // sphere.isVisible = false
-  // scene.addMesh(sphere)
-
-  // const greenEnergyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync("greenEnergyBall.glb", undefined, scene)
-  // const orb = greenEnergyBall.meshes[0]
-  // orb.setParent(sphere)
-  // orb.scaling.scaleInPlace(0.03)
-  // scene.addMesh(orb, true)
+  const velocity = to.position.subtract(from.position).normalize()
+  velocity.x = velocity.x * (Math.random())
+  velocity.y = velocity.y * (Math.random())
+  velocity.z = velocity.z * (Math.random())
+  velocity.normalize().scaleInPlace(0.5)
 
   const trail = new BABYLON.TrailMesh('trail', sphere, scene, 0.2, 30, true)
   const sourceMat = new BABYLON.StandardMaterial('sourceMat', scene) // This'll be the material on the trail
   sourceMat.emissiveColor = sourceMat.diffuseColor = color
   sourceMat.specularColor = BABYLON.Color3.Black()
   trail.material = sourceMat
-  // trail.position = sphere.position.clone()
-  // trail.setParent(sphere)
 
   const datum = { id, to, from, sphere, trail, velocity }
   if (projectileData[from.name]) {
@@ -91,6 +83,11 @@ const update = (pd: ProjectileDatum, scene: Scene) => {
 
   sphere.position.addInPlace(pd.velocity)
 
+  // Influence projectiles towards their target
+  const magnitude = pd.velocity.length()
+  const ultimateDirection = pd.to.position.subtract(pd.sphere.position).normalize()
+  pd.velocity.addInPlace(ultimateDirection.scale(1 / distanceToTravel)).normalize().scaleInPlace(magnitude)
+
   return sphere
 }
 
@@ -118,52 +115,20 @@ export const init = (scene: Scene) => {
 export const start = async (from: Mesh, to: Mesh, scene: Scene) => {
   meshProjectingState[from.name] = true
 
-  // const numProjectiles = from.getBoundingInfo().boundingSphere.radius
-  const numProjectiles = 10
+  const numProjectiles = Math.ceil(from.getBoundingInfo().boundingSphere.radius) * 5
 
-  // // Set up new rendering pipeline for glow // TODO This is an important visual effect
-  // const pipeline = new BABYLON.DefaultRenderingPipeline("default", true, scene, [camera])
-  // scene.imageProcessingConfiguration.toneMappingEnabled = true
-  // scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES
-  // scene.imageProcessingConfiguration.exposure = 3
-  // pipeline.glowLayerEnabled = true
-  // pipeline.glowLayer.intensity = 0.5
+  let i = 1
+  initProjectile(to, from, scene)
+  let startInterval = setInterval(() => {
+    if (i >= numProjectiles) {
+      clearInterval(startInterval)
+      return
+    }
 
-  // Use Ammo physics plugin
-  // This is for gravity at least, possibly also collisions
-  // I don't think I need this if I'm using SPS I can just dictate the particles' velocities
-  // scene.enablePhysics(new BABYLON.Vector3(0, -9.8 / 3, 0), new BABYLON.AmmoJSPlugin())
-  // scene.enablePhysics(to.position.subtract(from.position))
-
-  // orbParentSphere.scaling.scaleInPlace(0.3) // TODO What's this for
-  // orb.scaling.scaleInPlace(0.03) // TODO What's this for
-  // orb.rotation.set(Math.random() * 2 * Math.PI, Math.random() * 2 * Math.PI, Math.random() * 2 * Math.PI) // TODO What's this for
-  // orb.scaling.z *= Math.random() > 0.5 ? -1 : 1 // TODO What's this for
-
-  // orb.physicsImpostor = new BABYLON.PhysicsImpostor(orb, BABYLON.PhysicsImpostor.SphereImpostor, {
-  //   mass: 1,
-  //   restitution: 0.6
-  // })
-
-  for (let i = 0; i < numProjectiles; i++) {
     initProjectile(to, from, scene)
-  }
+    i++
+  }, 300)
 
-  // from https://doc.babylonjs.com/features/featuresDeepDive/particles/solid_particle_system/sps_animate
-  // TODO Make updateAll not need to take a from, it just iterates over all the meshes
-  // scene.onBeforeRenderObservable.add(updateAll(scene))
-
-  // // Create physics impostors // This ground looked great in the example
-  // const ground = Mesh.CreateBox("Ground", 1, scene)
-  // ground.scaling = new BABYLON.Vector3(100, 1, 100)
-  // ground.position.y = environment.ground.position.y - (0.5 + 0.001)
-  // ground.material = new BABYLON.StandardMaterial("test", scene)
-  // ground.material.alpha = 0.99
-  // ground.material.alphaMode = BABYLON.Engine.ALPHA_ONEONE
-  // ground.physicsImpostor = new BABYLON.PhysicsImpostor(ground, BABYLON.PhysicsImpostor.BoxImpostor, {
-  //   mass: 0,
-  //   restitution: 0.6
-  // })
 }
 
 /**
@@ -173,6 +138,5 @@ export const start = async (from: Mesh, to: Mesh, scene: Scene) => {
 */
 export const stopFor = (mesh: Mesh, scene: Scene) => {
   meshProjectingState[mesh.name] = false
-  // scene.onBeforeRenderObservable.clear() // TODO This'll clear all of em but really we just want to clear ours
 }
 
