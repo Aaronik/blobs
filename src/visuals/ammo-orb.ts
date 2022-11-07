@@ -62,6 +62,35 @@ const initProjectile = async (to: Mesh, from: Mesh, scene: Scene) => {
 
 }
 
+const generateProjectileExplosion = (to: Mesh, from: Mesh, scene: Scene) => {
+  // Make 3 - 6 new smaller bits, totaling in size to the projectile
+  // Have them moving in random directions along the outer hemisphere from which they came
+  // Update each particle:
+  // - Decelerate
+  // - Fade
+  // Remove each particle when the alpha is <= 0
+
+  const numParticles = Math.ceil(Math.random() * 3) + 3
+
+  for (let i = 0; i < numParticles; i++) {
+    const id = window.crypto.randomUUID()
+    const opts = {
+      segments: 16,
+      diameter: (Math.random() * 1)
+    }
+    const particle = BABYLON.MeshBuilder.CreateSphere('explosion-particle-' + id, opts, scene)
+  }
+}
+
+// TODO This will probably want to be moved to game logic eventually.
+// And everything in there to setup logic
+const handleCollision = (to: Mesh, from: Mesh) => {
+  const boundingInfo = to.getBoundingInfo()
+  boundingInfo.boundingSphere.radius += 0.1
+
+  to.setBoundingInfo(boundingInfo)
+}
+
 const update = (pd: ProjectileDatum, scene: Scene) => {
   const sphere = pd.sphere
   const distanceTraveled = sphere.position.subtract(pd.from.position).length()
@@ -72,8 +101,10 @@ const update = (pd: ProjectileDatum, scene: Scene) => {
   if (hasCollidedWithDestination) {
     const { to, from } = pd
     removeProjectile(pd)
+    handleCollision(to, from)
+    // generateProjectileExplosion(to, from, scene)
 
-    // If this mesh is still shooting TODO Might need to make this a nested object with [from.name][to.name]
+    // If this mesh is still shooting
     if (meshProjectingState[from.name]) {
       initProjectile(to, from, scene)
     }
