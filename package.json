@@ -13,6 +13,7 @@
     "babylonjs": "^5.30.0",
     "babylonjs-loaders": "^5.30.0",
     "cannon": "^0.6.2",
+    "gh-pages": "^4.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
@@ -23,7 +24,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "release": "npm run build && npm run deploy && rm -rf build",
+    "deploy": "gh-pages -d build"
   },
   "eslintConfig": {
     "extends": [
