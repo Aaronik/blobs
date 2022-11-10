@@ -2,6 +2,8 @@ import * as BABYLON from 'babylonjs'
 import 'babylonjs-loaders'
 window.CANNON = require('cannon')
 
+let RATE_MULTIPLIER = 1
+
 type Mesh = BABYLON.Mesh
 type Scene = BABYLON.Scene
 
@@ -87,10 +89,7 @@ const generateProjectileExplosion = (to: Mesh, from: Mesh, scene: Scene) => {
 // TODO This will probably want to be moved to game logic eventually.
 // And everything in there to setup logic
 const handleCollision = (to: Mesh, from: Mesh) => {
-  const boundingInfo = to.getBoundingInfo()
-  boundingInfo.boundingSphere.radius += 0.1
-
-  to.setBoundingInfo(boundingInfo)
+  to.metadata.handleShot(from)
 }
 
 const update = (pd: ProjectileDatum, scene: Scene) => {
@@ -136,15 +135,19 @@ const removeProjectile = (pd: ProjectileDatum) => {
 }
 
 // Originally nicked from https://playground.babylonjs.com/#1F4UET#33
-export const init = (scene: Scene) => {
+export const init = (scene: Scene, rateMultiplier: number) => {
+  RATE_MULTIPLIER = rateMultiplier
   scene.onBeforeRenderObservable.add(updateAll(scene))
 }
 
+// TODO For speed gains, I think these pages will definitely help:
+// * https://doc.babylonjs.com/features/featuresDeepDive/mesh/copies
+// * https://doc.babylonjs.com/features/featuresDeepDive/mesh/LOD
 export const start = async (from: Mesh, to: Mesh, scene: Scene) => {
   meshProjectingState[from.name] = true
 
   const delayThenFireAndSet = () => {
-    const projectileRate = 150 / from.getBoundingInfo().boundingSphere.radius
+    const projectileRate = RATE_MULTIPLIER / Math.log(from.metadata.health)
 
     setTimeout(() => {
       if (!meshProjectingState[from.name]) return

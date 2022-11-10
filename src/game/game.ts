@@ -3,9 +3,12 @@ import * as BABYLON from 'babylonjs'
 import * as ammoOrbs from '../visuals/ammo-orb'
 
 const NUM_SPHERES = 5
-const MAX_SPHERE_SIZE = 4
-const SPHERE_POSITION_SPREAD = MAX_SPHERE_SIZE * 20
+const SPHERE_MAX_SIZE = 1
+const SPHERE_MIN_SIZE = 0.5
+const SPHERE_MAX_HEALTH = 1000
+const SPHERE_POSITION_SPREAD = (Math.log(SPHERE_MAX_SIZE) + 1) * 100
 const INITIAL_CAMERA_DISTANCE = SPHERE_POSITION_SPREAD * 1.5
+const PROJECTILE_RATE_MULTIPLIER = (SPHERE_MAX_HEALTH) * 0.5 // The higher the slower
 
 const COLORS3 = {
   green: new BABYLON.Color3(0, 42 / 255, 16 / 255), // dark green
@@ -38,10 +41,31 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
 
   const opts = {
     segments: 32,
-    diameter: Math.round(Math.random() * MAX_SPHERE_SIZE)
+    diameter: 1,
+    updatable: true
   }
 
   const sphere = BABYLON.MeshBuilder.CreateSphere('sphere-' + id, opts, scene)
+
+  sphere.metadata = {
+    health: 5,
+    handleShot(from: BABYLON.Mesh) {
+      sphere.metadata.health = sphere.metadata.health < SPHERE_MAX_HEALTH ? sphere.metadata.health + 1 : SPHERE_MAX_HEALTH
+      this.updateSize()
+    },
+    updateSize() {
+      const sphereSizeSpread = SPHERE_MAX_SIZE - SPHERE_MIN_SIZE
+      const percentageOfMaxHealth = this.health / SPHERE_MAX_HEALTH
+      const healthSpreadRatio = percentageOfMaxHealth * sphereSizeSpread
+      const finalSize = healthSpreadRatio + SPHERE_MIN_SIZE
+
+      console.log(`${sphere.name}: health: ${sphere.metadata.health}, size: ${finalSize}`)
+
+      sphere.scaling.x = finalSize
+      sphere.scaling.y = finalSize
+      sphere.scaling.z = finalSize
+    },
+  }
 
   sphere.isVisible = false
 
@@ -52,8 +76,6 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
   orb.setParent(sphere)
   scene.addMesh(orb, true)
 
-  sphere.scaling.scaleInPlace(0.1).scaleInPlace(opts.diameter)
-
   const getRandomPosition = () => {
     return new BABYLON.Vector3(
       Math.random() * SPHERE_POSITION_SPREAD,
@@ -63,6 +85,8 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
   }
 
   sphere.position = getRandomPosition()
+
+  sphere.metadata.updateSize()
 
   // TODO This does not work and I'm tired of figuring it out. The issue is that intersectsMesh ALWAYS returns true.
   const ensureNoOverlap = () => {
@@ -126,7 +150,7 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
   const highlight = new BABYLON.HighlightLayer('hl1', scene)
 
   // Get them projectiles set up
-  ammoOrbs.init(scene)
+  ammoOrbs.init(scene, PROJECTILE_RATE_MULTIPLIER)
 
   // Focus camera on sphere that's clicked on. Uses ArcRotateCamera
   scene.onPointerDown = function(_evt, pickInfo) {
