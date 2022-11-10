@@ -62,6 +62,8 @@ const initProjectile = async (to: Mesh, from: Mesh, scene: Scene) => {
 
 }
 
+// NOTE: Before this is implemented, I showed this to Lex and RayShyne and they both reall loved
+// the visuals. So I may not need to do any more on the visual front.
 const generateProjectileExplosion = (to: Mesh, from: Mesh, scene: Scene) => {
   // Make 3 - 6 new smaller bits, totaling in size to the projectile
   // Have them moving in random directions along the outer hemisphere from which they came
@@ -104,14 +106,10 @@ const update = (pd: ProjectileDatum, scene: Scene) => {
     handleCollision(to, from)
     // generateProjectileExplosion(to, from, scene)
 
-    // If this mesh is still shooting
-    if (meshProjectingState[from.name]) {
-      initProjectile(to, from, scene)
-    }
-
     return
   }
 
+  // Move the projectile based on its velocity
   sphere.position.addInPlace(pd.velocity)
 
   // Influence projectiles towards their target
@@ -138,7 +136,6 @@ const removeProjectile = (pd: ProjectileDatum) => {
 }
 
 // Originally nicked from https://playground.babylonjs.com/#1F4UET#33
-
 export const init = (scene: Scene) => {
   scene.onBeforeRenderObservable.add(updateAll(scene))
 }
@@ -146,19 +143,17 @@ export const init = (scene: Scene) => {
 export const start = async (from: Mesh, to: Mesh, scene: Scene) => {
   meshProjectingState[from.name] = true
 
-  const numProjectiles = Math.ceil(from.getBoundingInfo().boundingSphere.radius) * 5
+  const delayThenFireAndSet = () => {
+    const projectileRate = 150 / from.getBoundingInfo().boundingSphere.radius
 
-  let i = 1
-  initProjectile(to, from, scene)
-  let startInterval = setInterval(() => {
-    if (i >= numProjectiles) {
-      clearInterval(startInterval)
-      return
-    }
+    setTimeout(() => {
+      if (!meshProjectingState[from.name]) return
+      initProjectile(to, from, scene)
+      delayThenFireAndSet()
+    }, projectileRate)
+  }
 
-    initProjectile(to, from, scene)
-    i++
-  }, 300)
+  delayThenFireAndSet()
 
 }
 

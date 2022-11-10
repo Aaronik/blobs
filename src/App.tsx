@@ -2,7 +2,7 @@ import './App.css'
 import Canvas from './components/canvas'
 import game from './game/game'
 
-const height = window.innerHeight - 3
+const height = window.innerHeight
 const width = window.innerWidth
 
 function App() {
