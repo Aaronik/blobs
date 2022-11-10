@@ -33,15 +33,15 @@ const getRandomBoundingPosition = (emitter: Mesh) => {
 }
 
 const initProjectile = async (to: Mesh, from: Mesh, scene: Scene) => {
-  const color = BABYLON.Color3.Green()
+  const color = from.metadata.color
   const id = window.crypto.randomUUID() // TODO this doesn't work on http, maybe it's not safe here
-  const sphere = BABYLON.MeshBuilder.CreateSphere(id, { segments: 16, diameter: 1 }, scene)
+  const projectile = BABYLON.MeshBuilder.CreateSphere(id, { segments: 16, diameter: 1 }, scene)
   const material = new BABYLON.StandardMaterial("", scene)
   material.emissiveColor = material.diffuseColor = color
-  sphere.material = material
-  sphere.bakeCurrentTransformIntoVertices()
-  sphere.position = getRandomBoundingPosition(from)
-  sphere.computeWorldMatrix(true)
+  projectile.material = material
+  projectile.bakeCurrentTransformIntoVertices()
+  projectile.position = getRandomBoundingPosition(from)
+  projectile.computeWorldMatrix(true)
 
   const velocity = to.position.subtract(from.position).normalize()
   velocity.x = velocity.x * (Math.random())
@@ -49,13 +49,13 @@ const initProjectile = async (to: Mesh, from: Mesh, scene: Scene) => {
   velocity.z = velocity.z * (Math.random())
   velocity.normalize().scaleInPlace(0.5)
 
-  const trail = new BABYLON.TrailMesh('trail', sphere, scene, 0.2, 30, true)
+  const trail = new BABYLON.TrailMesh('trail', projectile, scene, 0.2, 30, true)
   const sourceMat = new BABYLON.StandardMaterial('sourceMat', scene) // This'll be the material on the trail
   sourceMat.emissiveColor = sourceMat.diffuseColor = color
   sourceMat.specularColor = BABYLON.Color3.Black()
   trail.material = sourceMat
 
-  const datum = { id, to, from, sphere, trail, velocity }
+  const datum = { id, to, from, sphere: projectile, trail, velocity }
   if (projectileData[from.name]) {
     projectileData[from.name].push(datum)
   } else {
@@ -89,7 +89,7 @@ const generateProjectileExplosion = (to: Mesh, from: Mesh, scene: Scene) => {
 // TODO This will probably want to be moved to game logic eventually.
 // And everything in there to setup logic
 const handleCollision = (to: Mesh, from: Mesh) => {
-  to.metadata.handleShot(from)
+  to?.metadata?.handleShot(from)
 }
 
 const update = (pd: ProjectileDatum, scene: Scene) => {

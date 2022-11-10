@@ -11,14 +11,13 @@ const INITIAL_CAMERA_DISTANCE = SPHERE_POSITION_SPREAD * 1.5
 const PROJECTILE_RATE_MULTIPLIER = (SPHERE_MAX_HEALTH) * 0.5 // The higher the slower
 
 const COLORS3 = {
-  green: new BABYLON.Color3(0, 42 / 255, 16 / 255), // dark green
-  blue: BABYLON.Color3.Blue()
+  darkGreen: new BABYLON.Color3(0, 42 / 255, 16 / 255), // dark green
+  green: BABYLON.Color3.Green(),
+  yellow: BABYLON.Color3.Yellow(),
+  pink: BABYLON.Color3.Red(),
 }
 
-// const COLORS4 = {
-//   green: BABYLON.Color4.FromColor3(COLORS3.green),
-//   blue: BABYLON.Color4.FromColor3(COLORS3.blue)
-// }
+type Side = 'pink' | 'yellow' | 'green'
 
 const getAveragePosition = (objects: { position: BABYLON.Vector3 }[]) => {
   const sumVec = objects.reduce((sum, object) => {
@@ -36,21 +35,89 @@ const getAveragePosition = (objects: { position: BABYLON.Vector3 }[]) => {
   )
 }
 
+const getRandomPosition = () => {
+  return new BABYLON.Vector3(
+    Math.random() * SPHERE_POSITION_SPREAD,
+    Math.random() * SPHERE_POSITION_SPREAD,
+    Math.random() * SPHERE_POSITION_SPREAD
+  )
+}
+
+// TODO This does not work and I'm tired of figuring it out. The issue is that intersectsMesh ALWAYS returns true.
+const ensureNoOverlap = (sphere: BABYLON.Mesh, existingSpheres: BABYLON.Mesh[]) => {
+  const hasIntersections = existingSpheres.some(existingSphere => existingSphere.intersectsMesh(sphere, true, true))
+  if (hasIntersections) {
+    console.log('found collision making ' + sphere.name)
+    sphere.position = getRandomPosition()
+    // ensureNoOverlap()
+  }
+}
+
+const assignOrbToSphere = async (sphere: BABYLON.Mesh, side: Side, scene: BABYLON.Scene) => {
+  const energyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync(side + "EnergyBall.glb", undefined, scene)
+  const orb = energyBall.meshes[0]
+  orb.name = 'orb-' + sphere.name
+  orb.setParent(sphere)
+  scene.addMesh(orb, true)
+  orb.setAbsolutePosition(sphere.getAbsolutePosition())
+}
+
+const removeOrbFromSphere = (sphere: BABYLON.Mesh) => {
+  sphere.getChildMeshes().forEach(child => {
+    sphere.removeChild(child)
+    child.dispose()
+  })
+}
+
 const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[]) => {
   const id = window.crypto.randomUUID()
 
   const opts = {
-    segments: 32,
+    segments: 16,
     diameter: 1,
     updatable: true
   }
 
   const sphere = BABYLON.MeshBuilder.CreateSphere('sphere-' + id, opts, scene)
 
+  let color: Side = 'green'
+  if (Math.random() > 0.6) color = 'pink'
+  if (Math.random() > 0.6) color = 'yellow'
+
   sphere.metadata = {
     health: 5,
-    handleShot(from: BABYLON.Mesh) {
-      sphere.metadata.health = sphere.metadata.health < SPHERE_MAX_HEALTH ? sphere.metadata.health + 1 : SPHERE_MAX_HEALTH
+    side: color,
+    color: color === 'green' ? COLORS3.green : color === 'yellow' ? COLORS3.yellow : COLORS3.pink,
+    async handleShot(from: BABYLON.Mesh) {
+      console.log(sphere.metadata)
+      // @ts-ignore
+      window.sphere = sphere
+
+      if (from.metadata.side === sphere.metadata.side) {
+        // Same side, add to health
+        sphere.metadata.health = sphere.metadata.health < SPHERE_MAX_HEALTH ? sphere.metadata.health + 1 : SPHERE_MAX_HEALTH
+      } else {
+        // Other side, remove health
+        sphere.metadata.health = sphere.metadata.health - 1
+        if (sphere.metadata.health <= 0) {
+          // Out of health, change sides
+          sphere.metadata.side = from.metadata.side
+          sphere.metadata.color = from.metadata.color
+          // Ok, removing the sphere entirely and creating a new one of new side in its place is a good idea
+          // but then we need to reinitializing whoever is firing at it to be firing back at it. It'd be so much
+          // easier if we could just replace the color of the sphere.
+          //
+          // What if we loaded in each orb only once and assigned it to the sphere based on what side it currently has?
+
+          console.log('before:', sphere.position)
+          removeOrbFromSphere(sphere)
+          await assignOrbToSphere(sphere, from.metadata.side, scene)
+          console.log('after:', sphere.position)
+
+          sphere.scaling = BABYLON.Vector3.Zero()
+          sphere.metadata.updateSize()
+        }
+      }
       this.updateSize()
     },
     updateSize() {
@@ -58,8 +125,6 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
       const percentageOfMaxHealth = this.health / SPHERE_MAX_HEALTH
       const healthSpreadRatio = percentageOfMaxHealth * sphereSizeSpread
       const finalSize = healthSpreadRatio + SPHERE_MIN_SIZE
-
-      console.log(`${sphere.name}: health: ${sphere.metadata.health}, size: ${finalSize}`)
 
       sphere.scaling.x = finalSize
       sphere.scaling.y = finalSize
@@ -69,36 +134,12 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
 
   sphere.isVisible = false
 
-  // This is great but it's a little buggy. I'm starting to wonder if babylon.js isn't just very buggy.
-  const greenEnergyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync("greenEnergyBall.glb", undefined, scene)
-  const orb = greenEnergyBall.meshes[0]
-  orb.name = 'orb-' + id
-  orb.setParent(sphere)
-  scene.addMesh(orb, true)
-
-  const getRandomPosition = () => {
-    return new BABYLON.Vector3(
-      Math.random() * SPHERE_POSITION_SPREAD,
-      Math.random() * SPHERE_POSITION_SPREAD,
-      Math.random() * SPHERE_POSITION_SPREAD
-    )
-  }
+  await assignOrbToSphere(sphere, color, scene)
 
   sphere.position = getRandomPosition()
-
   sphere.metadata.updateSize()
 
-  // TODO This does not work and I'm tired of figuring it out. The issue is that intersectsMesh ALWAYS returns true.
-  const ensureNoOverlap = () => {
-    const hasIntersections = existingSpheres.some(existingSphere => existingSphere.intersectsMesh(sphere, true, true))
-    if (hasIntersections) {
-      console.log('found collision making ' + sphere.name)
-      sphere.position = getRandomPosition()
-      // ensureNoOverlap()
-    }
-  }
-
-  ensureNoOverlap()
+  // ensureNoOverlap(sphere, existingSpheres)
 
   return sphere
 }
