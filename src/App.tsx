@@ -2,8 +2,8 @@ import './App.css'
 import Canvas from './components/canvas'
 import game from './game/game'
 
-const height = window.innerHeight
-const width = window.innerWidth
+const height = window.innerHeight + 1
+const width = window.innerWidth + 3
 
 function App() {
   const onCanvas = (canvas: HTMLCanvasElement) => {

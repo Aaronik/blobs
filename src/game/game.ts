@@ -2,6 +2,14 @@ import * as BABYLON from 'babylonjs'
 // import * as particleSystem from '../visuals/particle-system'
 import * as ammoOrbs from '../visuals/ammo-orb'
 
+// BRAINSTORMING:
+// * TO use Orbs or Not to use Orbs, Orbs:
+// + Beautiful, Lex and RayShyne already loved it
+// - Scaling issue
+// - Blinking issue when changing colors
+// - Massively massively increase build size
+//
+
 const NUM_SPHERES = 5
 const SPHERE_MAX_SIZE = 1
 const SPHERE_MIN_SIZE = 0.5
@@ -74,7 +82,7 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
 
   const opts = {
     segments: 16,
-    diameter: 1,
+    // diameter: 1,
     updatable: true
   }
 
@@ -109,12 +117,8 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
           //
           // What if we loaded in each orb only once and assigned it to the sphere based on what side it currently has?
 
-          console.log('before:', sphere.position)
           removeOrbFromSphere(sphere)
           await assignOrbToSphere(sphere, from.metadata.side, scene)
-          console.log('after:', sphere.position)
-
-          sphere.scaling = BABYLON.Vector3.Zero()
           sphere.metadata.updateSize()
         }
       }
@@ -133,6 +137,10 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
   }
 
   sphere.isVisible = false
+  // const mat = new BABYLON.StandardMaterial('sourceMat', scene)
+  // mat.emissiveColor = COLORS3[color]
+  // mat.specularColor = BABYLON.Color3.Black()
+  // sphere.material = mat
 
   await assignOrbToSphere(sphere, color, scene)
 
@@ -177,6 +185,17 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
   }
   // @ts-ignore
   window.spheres = spheres
+
+  const wobbleAmounts = [0.001, 0.002, 0.001, -0.001, -0.001, -0.002]
+  let i = 0
+  scene.onBeforeRenderObservable.add(() => {
+    spheres.forEach(sphere => {
+      sphere.scaling.x += wobbleAmounts[i]
+      sphere.scaling.y += wobbleAmounts[(i + 1) % wobbleAmounts.length]
+      sphere.scaling.z += wobbleAmounts[(i + 2) % wobbleAmounts.length]
+    })
+    i = (i + 1) % wobbleAmounts.length
+  })
 
   // Target the camera to scene origin
   camera.setTarget(getAveragePosition(spheres))
