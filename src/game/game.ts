@@ -2,14 +2,6 @@ import * as BABYLON from 'babylonjs'
 // import * as particleSystem from '../visuals/particle-system'
 import * as ammoOrbs from '../visuals/ammo-orb'
 
-// BRAINSTORMING:
-// * TO use Orbs or Not to use Orbs, Orbs:
-// + Beautiful, Lex and RayShyne already loved it
-// - Scaling issue
-// - Blinking issue when changing colors
-// - Massively massively increase build size
-//
-
 const NUM_SPHERES = 5
 const SPHERE_MAX_SIZE = 1
 const SPHERE_MIN_SIZE = 0.5
@@ -17,6 +9,8 @@ const SPHERE_MAX_HEALTH = 1000
 const SPHERE_POSITION_SPREAD = (Math.log(SPHERE_MAX_SIZE) + 1) * 100
 const INITIAL_CAMERA_DISTANCE = SPHERE_POSITION_SPREAD * 1.5
 const PROJECTILE_RATE_MULTIPLIER = (SPHERE_MAX_HEALTH) * 0.5 // The higher the slower
+
+type Sphere = BABYLON.Mesh
 
 const COLORS3 = {
   darkGreen: new BABYLON.Color3(0, 42 / 255, 16 / 255), // dark green
@@ -52,7 +46,7 @@ const getRandomPosition = () => {
 }
 
 // TODO This does not work and I'm tired of figuring it out. The issue is that intersectsMesh ALWAYS returns true.
-const ensureNoOverlap = (sphere: BABYLON.Mesh, existingSpheres: BABYLON.Mesh[]) => {
+const ensureNoOverlap = (sphere: Sphere, existingSpheres: Sphere[]) => {
   const hasIntersections = existingSpheres.some(existingSphere => existingSphere.intersectsMesh(sphere, true, true))
   if (hasIntersections) {
     console.log('found collision making ' + sphere.name)
@@ -61,7 +55,7 @@ const ensureNoOverlap = (sphere: BABYLON.Mesh, existingSpheres: BABYLON.Mesh[]) 
   }
 }
 
-const assignOrbToSphere = async (sphere: BABYLON.Mesh, side: Side, scene: BABYLON.Scene) => {
+const assignOrbToSphere = async (sphere: Sphere, side: Side, scene: BABYLON.Scene) => {
   const energyBall = await BABYLON.SceneLoader.LoadAssetContainerAsync(side + "EnergyBall.glb", undefined, scene)
   const orb = energyBall.meshes[0]
   orb.name = 'orb-' + sphere.name
@@ -71,19 +65,52 @@ const assignOrbToSphere = async (sphere: BABYLON.Mesh, side: Side, scene: BABYLO
   return orb
 }
 
-const removeOrbFromSphere = (sphere: BABYLON.Mesh) => {
+const removeOrbFromSphere = (sphere: Sphere) => {
   sphere.getChildMeshes().forEach(child => {
     sphere.removeChild(child)
     child.dispose()
   })
 }
 
-const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[]) => {
+const explodeOrb = async (sphere: Sphere, scene: BABYLON.Scene) => {
+  const orb = sphere.getChildMeshes()[3]!
+  const frameRate = 10
+  const expandX = new BABYLON.Animation("xSlide", "scaling.x", frameRate, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE)
+  const expandY = new BABYLON.Animation("ySlide", "scaling.y", frameRate, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE)
+  const expandZ = new BABYLON.Animation("zSlide", "scaling.z", frameRate, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE)
+  const fade = new BABYLON.Animation("fade", "visibility", frameRate, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE)
+
+  const expandKeyframes = [
+    { frame: 0, value: orb.scaling.x },
+    { frame: 1, value: orb.scaling.x * 1.2 },
+    { frame: 5, value: orb.scaling.x * 2 },
+  ]
+
+  const visiblityKeyframes = [
+    { frame: 0, value: 1 },
+    { frame: 1, value: 0.8 },
+    { frame: 5, value: 0 }
+  ]
+
+  expandX.setKeys(expandKeyframes)
+  expandY.setKeys(expandKeyframes)
+  expandZ.setKeys(expandKeyframes)
+  fade.setKeys(visiblityKeyframes)
+
+  orb.animations.push(expandX, expandY, expandZ, fade)
+
+  return new Promise(resolve => {
+    scene.beginAnimation(orb, 0, 2 * frameRate, false, undefined, () => {
+      resolve(true)
+    })
+  })
+}
+
+const createSphere = async (scene: BABYLON.Scene, existingSpheres: Sphere[]) => {
   const id = window.crypto.randomUUID()
 
   const opts = {
     segments: 16,
-    // diameter: 1,
     updatable: true
   }
 
@@ -97,7 +124,7 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
     health: 5,
     side: color,
     color: color === 'green' ? COLORS3.green : color === 'yellow' ? COLORS3.yellow : COLORS3.pink,
-    async handleShot(from: BABYLON.Mesh) {
+    async handleShot(from: Sphere) {
       console.log(sphere.metadata)
       // @ts-ignore
       window.sphere = sphere
@@ -112,12 +139,7 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
           // Out of health, change sides
           sphere.metadata.side = from.metadata.side
           sphere.metadata.color = from.metadata.color
-          // Ok, removing the sphere entirely and creating a new one of new side in its place is a good idea
-          // but then we need to reinitializing whoever is firing at it to be firing back at it. It'd be so much
-          // easier if we could just replace the color of the sphere.
-          //
-          // What if we loaded in each orb only once and assigned it to the sphere based on what side it currently has?
-
+          await explodeOrb(sphere, scene)
           removeOrbFromSphere(sphere)
           const orb = await assignOrbToSphere(sphere, from.metadata.side, scene)
           // The orb here always comes in at size 1, but it needs to be the sphere's minimum size
@@ -181,23 +203,12 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
   // pipeline.glowLayerEnabled = true
   // pipeline.glowLayer.intensity = 0.5
 
-  const spheres: BABYLON.Mesh[] = []
+  const spheres: Sphere[] = []
   for (let i = 0; i < NUM_SPHERES; i++) {
     spheres.push(await createSphere(scene, spheres))
   }
   // @ts-ignore
   window.spheres = spheres
-
-  // const wobbleAmounts = [0.001, 0.002, 0.001, -0.001, -0.001, -0.002]
-  // let i = 0
-  // scene.onBeforeRenderObservable.add(() => {
-  //   spheres.forEach(sphere => {
-  //     sphere.scaling.x += wobbleAmounts[i]
-  //     sphere.scaling.y += wobbleAmounts[(i + 1) % wobbleAmounts.length]
-  //     sphere.scaling.z += wobbleAmounts[(i + 2) % wobbleAmounts.length]
-  //   })
-  //   i = (i + 1) % wobbleAmounts.length
-  // })
 
   // Target the camera to scene origin
   camera.setTarget(getAveragePosition(spheres))
@@ -218,7 +229,7 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
   scene.onPointerDown = function(_evt, pickInfo) {
     if (pickInfo.hit && pickInfo.pickedMesh) {
       const mesh = pickInfo.pickedMesh as BABYLON.Mesh
-      const pickedSphere = mesh.parent!.parent! as BABYLON.Mesh
+      const pickedSphere = mesh.parent!.parent! as Sphere
 
       if (highlight.hasMesh(mesh)) {
         highlight.removeMesh(mesh)
