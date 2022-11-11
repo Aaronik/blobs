@@ -22,6 +22,7 @@ const projectileData: { [name: string]: ProjectileDatum[] } = {}
 // Is the mesh with this name firing right now?
 const meshProjectingState: { [name: string]: boolean } = {}
 
+// TODO This is not working either
 const getRandomBoundingPosition = (emitter: Mesh) => {
   const emitterRadius = emitter.getBoundingInfo().boundingSphere.radiusWorld
   const vec = new BABYLON.Vector3(

@@ -68,6 +68,7 @@ const assignOrbToSphere = async (sphere: BABYLON.Mesh, side: Side, scene: BABYLO
   orb.setParent(sphere)
   scene.addMesh(orb, true)
   orb.setAbsolutePosition(sphere.getAbsolutePosition())
+  return orb
 }
 
 const removeOrbFromSphere = (sphere: BABYLON.Mesh) => {
@@ -103,7 +104,7 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
 
       if (from.metadata.side === sphere.metadata.side) {
         // Same side, add to health
-        sphere.metadata.health = sphere.metadata.health < SPHERE_MAX_HEALTH ? sphere.metadata.health + 1 : SPHERE_MAX_HEALTH
+        sphere.metadata.health = Math.max(sphere.metadata.health + 1, SPHERE_MAX_SIZE)
       } else {
         // Other side, remove health
         sphere.metadata.health = sphere.metadata.health - 1
@@ -118,8 +119,9 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: BABYLON.Mesh[
           // What if we loaded in each orb only once and assigned it to the sphere based on what side it currently has?
 
           removeOrbFromSphere(sphere)
-          await assignOrbToSphere(sphere, from.metadata.side, scene)
-          sphere.metadata.updateSize()
+          const orb = await assignOrbToSphere(sphere, from.metadata.side, scene)
+          // The orb here always comes in at size 1, but it needs to be the sphere's minimum size
+          orb.scaling.scaleInPlace(SPHERE_MIN_SIZE)
         }
       }
       this.updateSize()
@@ -186,16 +188,16 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
   // @ts-ignore
   window.spheres = spheres
 
-  const wobbleAmounts = [0.001, 0.002, 0.001, -0.001, -0.001, -0.002]
-  let i = 0
-  scene.onBeforeRenderObservable.add(() => {
-    spheres.forEach(sphere => {
-      sphere.scaling.x += wobbleAmounts[i]
-      sphere.scaling.y += wobbleAmounts[(i + 1) % wobbleAmounts.length]
-      sphere.scaling.z += wobbleAmounts[(i + 2) % wobbleAmounts.length]
-    })
-    i = (i + 1) % wobbleAmounts.length
-  })
+  // const wobbleAmounts = [0.001, 0.002, 0.001, -0.001, -0.001, -0.002]
+  // let i = 0
+  // scene.onBeforeRenderObservable.add(() => {
+  //   spheres.forEach(sphere => {
+  //     sphere.scaling.x += wobbleAmounts[i]
+  //     sphere.scaling.y += wobbleAmounts[(i + 1) % wobbleAmounts.length]
+  //     sphere.scaling.z += wobbleAmounts[(i + 2) % wobbleAmounts.length]
+  //   })
+  //   i = (i + 1) % wobbleAmounts.length
+  // })
 
   // Target the camera to scene origin
   camera.setTarget(getAveragePosition(spheres))
