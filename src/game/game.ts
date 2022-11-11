@@ -12,6 +12,9 @@ const PROJECTILE_RATE_MULTIPLIER = (SPHERE_MAX_HEALTH) * 0.5 // The higher the s
 
 type Sphere = BABYLON.Mesh
 
+// TODO
+// * When an ammo hits a sphere, check the color of the ammo, not the from. This is the bug tentacle wars has.
+
 const COLORS3 = {
   darkGreen: new BABYLON.Color3(0, 42 / 255, 16 / 255), // dark green
   green: BABYLON.Color3.Green(),
@@ -139,6 +142,7 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: Sphere[]) => 
           // Out of health, change sides
           sphere.metadata.side = from.metadata.side
           sphere.metadata.color = from.metadata.color
+          sphere.metadata.health = 10 // Otherwise it gets messed up toggling quickly between multiple colors
           await explodeOrb(sphere, scene)
           removeOrbFromSphere(sphere)
           const orb = await assignOrbToSphere(sphere, from.metadata.side, scene)
