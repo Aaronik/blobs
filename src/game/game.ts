@@ -137,6 +137,7 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: Sphere[]) => 
         sphere.metadata.health = sphere.metadata.health - 1
         if (sphere.metadata.health <= 0) {
           // Out of health, change sides
+          ammoOrbs.stopFor(sphere)
           sphere.metadata.side = side
           sphere.metadata.color = COLORS3[side]
           sphere.metadata.health = 10 // Otherwise it gets messed up toggling quickly between multiple colors

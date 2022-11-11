@@ -128,7 +128,11 @@ export const start = async (from: Mesh, to: Mesh, scene: Scene) => {
   meshProjectingState[from.name] = true
 
   const delayThenFireAndSet = () => {
+    // TODO I'm certain the reason for the explosion of particles at the end
+    // of a sphere's life is because of this log function. This needs to be changed
+    // to something more predictable.
     const projectileRate = RATE_MULTIPLIER / Math.log(from.metadata.health)
+    if (from.metadata.health === 0) return
 
     setTimeout(() => {
       if (!meshProjectingState[from.name]) return
