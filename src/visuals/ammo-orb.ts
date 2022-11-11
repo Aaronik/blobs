@@ -1,5 +1,6 @@
 import * as BABYLON from 'babylonjs'
 import 'babylonjs-loaders'
+import { Side } from '../game/game'
 window.CANNON = require('cannon')
 
 let RATE_MULTIPLIER = 1
@@ -11,8 +12,9 @@ type Scene = BABYLON.Scene
 type ProjectileDatum = {
   id: string
   from: Mesh
+  originalSide: Side
   to: Mesh
-  sphere: Mesh
+  projectile: Mesh
   trail: BABYLON.TrailMesh
   velocity: BABYLON.Vector3
 }
@@ -56,7 +58,7 @@ const initProjectile = async (to: Mesh, from: Mesh, scene: Scene) => {
   sourceMat.specularColor = BABYLON.Color3.Black()
   trail.material = sourceMat
 
-  const datum = { id, to, from, sphere: projectile, trail, velocity }
+  const datum = { id, to, from, projectile, trail, velocity, originalSide: from.metadata.side }
   if (projectileData[from.name]) {
     projectileData[from.name].push(datum)
   } else {
@@ -65,45 +67,23 @@ const initProjectile = async (to: Mesh, from: Mesh, scene: Scene) => {
 
 }
 
-// NOTE: Before this is implemented, I showed this to Lex and RayShyne and they both reall loved
-// the visuals. So I may not need to do any more on the visual front.
-const generateProjectileExplosion = (to: Mesh, from: Mesh, scene: Scene) => {
-  // Make 3 - 6 new smaller bits, totaling in size to the projectile
-  // Have them moving in random directions along the outer hemisphere from which they came
-  // Update each particle:
-  // - Decelerate
-  // - Fade
-  // Remove each particle when the alpha is <= 0
-
-  const numParticles = Math.ceil(Math.random() * 3) + 3
-
-  for (let i = 0; i < numParticles; i++) {
-    const id = window.crypto.randomUUID()
-    const opts = {
-      segments: 16,
-      diameter: (Math.random() * 1)
-    }
-    const particle = BABYLON.MeshBuilder.CreateSphere('explosion-particle-' + id, opts, scene)
-  }
-}
-
 // TODO This will probably want to be moved to game logic eventually.
 // And everything in there to setup logic
-const handleCollision = (to: Mesh, from: Mesh) => {
-  to?.metadata?.handleShot(from)
+const handleCollision = (side: Side, to: Mesh) => {
+  to?.metadata?.handleShot(side)
 }
 
-const update = (pd: ProjectileDatum, scene: Scene) => {
-  const sphere = pd.sphere
+const update = (pd: ProjectileDatum) => {
+  const sphere = pd.projectile
   const distanceTraveled = sphere.position.subtract(pd.from.position).length()
   const distanceToTravel = pd.to.position.subtract(pd.from.position).length()
 
   const hasCollidedWithDestination = distanceTraveled > distanceToTravel
 
   if (hasCollidedWithDestination) {
-    const { to, from } = pd
+    const { to } = pd
     removeProjectile(pd)
-    handleCollision(to, from)
+    handleCollision(pd.originalSide, to)
     // generateProjectileExplosion(to, from, scene)
 
     return
@@ -114,22 +94,22 @@ const update = (pd: ProjectileDatum, scene: Scene) => {
 
   // Influence projectiles towards their target
   const magnitude = pd.velocity.length()
-  const ultimateDirection = pd.to.position.subtract(pd.sphere.position).normalize()
+  const ultimateDirection = pd.to.position.subtract(pd.projectile.position).normalize()
   pd.velocity.addInPlace(ultimateDirection.scale(1 / distanceToTravel)).normalize().scaleInPlace(magnitude)
 
   return sphere
 }
 
-const updateAll = (scene: Scene) => () => {
+const updateAll = () => {
   Object.values(projectileData).forEach(projectiles => {
     projectiles.forEach(projectileDatum => {
-      update(projectileDatum, scene)
+      update(projectileDatum)
     })
   })
 }
 
 const removeProjectile = (pd: ProjectileDatum) => {
-  pd.sphere.dispose()
+  pd.projectile.dispose()
   pd.trail.dispose()
   const projectileIndex = projectileData[pd.from.name].findIndex(pdat => pdat.id === pd.id)
   projectileData[pd.from.name].splice(projectileIndex, 1)
@@ -138,7 +118,7 @@ const removeProjectile = (pd: ProjectileDatum) => {
 // Originally nicked from https://playground.babylonjs.com/#1F4UET#33
 export const init = (scene: Scene, rateMultiplier: number) => {
   RATE_MULTIPLIER = rateMultiplier
-  scene.onBeforeRenderObservable.add(updateAll(scene))
+  scene.onBeforeRenderObservable.add(updateAll)
 }
 
 // TODO For speed gains, I think these pages will definitely help:
@@ -166,7 +146,7 @@ export const start = async (from: Mesh, to: Mesh, scene: Scene) => {
 *
 * @param {Mesh} mesh The mesh from which the particles should stop emitting
 */
-export const stopFor = (mesh: Mesh, scene: Scene) => {
+export const stopFor = (mesh: Mesh) => {
   meshProjectingState[mesh.name] = false
 }
 

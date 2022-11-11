@@ -10,10 +10,9 @@ const SPHERE_POSITION_SPREAD = (Math.log(SPHERE_MAX_SIZE) + 1) * 100
 const INITIAL_CAMERA_DISTANCE = SPHERE_POSITION_SPREAD * 1.5
 const PROJECTILE_RATE_MULTIPLIER = (SPHERE_MAX_HEALTH) * 0.5 // The higher the slower
 
+export type Side = keyof typeof COLORS3
+export type Color = typeof COLORS3[keyof typeof COLORS3]
 type Sphere = BABYLON.Mesh
-
-// TODO
-// * When an ammo hits a sphere, check the color of the ammo, not the from. This is the bug tentacle wars has.
 
 const COLORS3 = {
   darkGreen: new BABYLON.Color3(0, 42 / 255, 16 / 255), // dark green
@@ -21,8 +20,6 @@ const COLORS3 = {
   yellow: BABYLON.Color3.Yellow(),
   pink: BABYLON.Color3.Red(),
 }
-
-type Side = 'pink' | 'yellow' | 'green'
 
 const getAveragePosition = (objects: { position: BABYLON.Vector3 }[]) => {
   const sumVec = objects.reduce((sum, object) => {
@@ -119,20 +116,20 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: Sphere[]) => 
 
   const sphere = BABYLON.MeshBuilder.CreateSphere('sphere-' + id, opts, scene)
 
-  let color: Side = 'green'
-  if (Math.random() > 0.6) color = 'pink'
-  if (Math.random() > 0.6) color = 'yellow'
+  let side: Side = 'green'
+  if (Math.random() > 0.6) side = 'pink'
+  if (Math.random() > 0.6) side = 'yellow'
 
   sphere.metadata = {
     health: 5,
-    side: color,
-    color: color === 'green' ? COLORS3.green : color === 'yellow' ? COLORS3.yellow : COLORS3.pink,
-    async handleShot(from: Sphere) {
+    side: side,
+    color: COLORS3[side],
+    async handleShot(side: Side) {
       console.log(sphere.metadata)
       // @ts-ignore
       window.sphere = sphere
 
-      if (from.metadata.side === sphere.metadata.side) {
+      if (side === sphere.metadata.side) {
         // Same side, add to health
         sphere.metadata.health = Math.max(sphere.metadata.health + 1, SPHERE_MAX_SIZE)
       } else {
@@ -140,12 +137,12 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: Sphere[]) => 
         sphere.metadata.health = sphere.metadata.health - 1
         if (sphere.metadata.health <= 0) {
           // Out of health, change sides
-          sphere.metadata.side = from.metadata.side
-          sphere.metadata.color = from.metadata.color
+          sphere.metadata.side = side
+          sphere.metadata.color = COLORS3[side]
           sphere.metadata.health = 10 // Otherwise it gets messed up toggling quickly between multiple colors
           await explodeOrb(sphere, scene)
           removeOrbFromSphere(sphere)
-          const orb = await assignOrbToSphere(sphere, from.metadata.side, scene)
+          const orb = await assignOrbToSphere(sphere, side, scene)
           // The orb here always comes in at size 1, but it needs to be the sphere's minimum size
           orb.scaling.scaleInPlace(SPHERE_MIN_SIZE)
         }
@@ -170,12 +167,12 @@ const createSphere = async (scene: BABYLON.Scene, existingSpheres: Sphere[]) => 
   // mat.specularColor = BABYLON.Color3.Black()
   // sphere.material = mat
 
-  await assignOrbToSphere(sphere, color, scene)
+  await assignOrbToSphere(sphere, side, scene)
 
   sphere.position = getRandomPosition()
   sphere.metadata.updateSize()
 
-  // ensureNoOverlap(sphere, existingSpheres)
+  ensureNoOverlap(sphere, existingSpheres)
 
   return sphere
 }
@@ -237,7 +234,7 @@ const createScene = async (engine: BABYLON.Engine, canvas: HTMLCanvasElement) =>
 
       if (highlight.hasMesh(mesh)) {
         highlight.removeMesh(mesh)
-        ammoOrbs.stopFor(pickedSphere, scene)
+        ammoOrbs.stopFor(pickedSphere)
       } else {
         highlight.addMesh(mesh, BABYLON.Color3.White())
 
